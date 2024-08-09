@@ -21,3 +21,8 @@ body {
 .Toastify__toast-theme--dark {
   background-color: #00000076 !important;
 }
+
+.typing-text{
+  color: rgba(255, 255, 255, 0.563);
+  font-size: 12px;
+}
