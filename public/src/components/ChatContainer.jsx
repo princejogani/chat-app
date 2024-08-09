@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/exhaustive-deps */
 import React, { useState, useEffect, useRef } from "react";
 import styled from "styled-components";
 import ChatInput from "./ChatInput";
@@ -5,11 +6,18 @@ import Logout from "./Logout";
 import { v4 as uuidv4 } from "uuid";
 import axios from "axios";
 import { sendMessageRoute, recieveMessageRoute } from "../utils/APIRoutes";
+import { useNavigate } from "react-router-dom";
 
 export default function ChatContainer({ currentChat, socket }) {
   const [messages, setMessages] = useState([]);
   const scrollRef = useRef();
   const [arrivalMessage, setArrivalMessage] = useState(null);
+  const [isTyping, setIstyping] = useState(false);
+
+
+  const startShare = async () => {
+    console.log("Sharing...");
+  };
 
   useEffect(async () => {
     const data = await JSON.parse(
@@ -32,7 +40,7 @@ export default function ChatContainer({ currentChat, socket }) {
     };
     getCurrentChat();
   }, [currentChat]);
-
+  
   const handleSendMsg = async (msg) => {
     const data = await JSON.parse(
       localStorage.getItem(process.env.REACT_APP_LOCALHOST_KEY)
@@ -58,6 +66,11 @@ export default function ChatContainer({ currentChat, socket }) {
       socket.current.on("msg-recieve", (msg) => {
         setArrivalMessage({ fromSelf: false, message: msg });
       });
+      socket.current.on("recieve-is-typing", (msg) => {
+        console.log(msg);
+        if (msg.length > 0) setIstyping(true)
+        else setIstyping(false)
+      });
     }
   }, []);
 
@@ -68,6 +81,37 @@ export default function ChatContainer({ currentChat, socket }) {
   useEffect(() => {
     scrollRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  const handleConnect = () => {
+    console.log("Let's Connect...");
+    const data = JSON.parse(localStorage.getItem(process.env.REACT_APP_LOCALHOST_KEY));
+    socket.current.emit("connect-request", { to: currentChat._id, from: data._id });
+  }
+
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    socket.current.on("connect-accepted", ({ roomId }) => {
+      navigate(`/meeting/${roomId}`);
+    });
+
+    return () => {
+      socket.current.off("connect-accepted");
+    };
+  }, [socket, navigate]);
+
+  useEffect(() => {
+    socket.current.on("connect-request-received", ({ roomId, from }) => {
+      if (window.confirm(`${from} wants to connect. Do you accept?`)) {
+        socket.current.emit("accept-connect", { roomId, to: from });
+        navigate(`/meeting/${roomId}`);
+      }
+    });
+    
+    return () => {
+      socket.current.off("connect-request-received");
+    };
+  }, [socket, navigate]);
 
   return (
     <Container>
@@ -81,18 +125,21 @@ export default function ChatContainer({ currentChat, socket }) {
           </div>
           <div className="username">
             <h3>{currentChat.username}</h3>
+            <span className="typing-text">{isTyping ? 'Typing...' : ''}</span>
           </div>
         </div>
-        <Logout />
+        <div className="user-details">
+          <Button onClick={() => handleConnect()}>Connect</Button>
+          <Logout />
+        </div>
       </div>
       <div className="chat-messages">
         {messages.map((message) => {
           return (
             <div ref={scrollRef} key={uuidv4()}>
               <div
-                className={`message ${
-                  message.fromSelf ? "sended" : "recieved"
-                }`}
+                className={`message ${message.fromSelf ? "sended" : "recieved"
+                  }`}
               >
                 <div className="content ">
                   <p>{message.message}</p>
@@ -102,7 +149,7 @@ export default function ChatContainer({ currentChat, socket }) {
           );
         })}
       </div>
-      <ChatInput handleSendMsg={handleSendMsg} />
+      <ChatInput handleSendMsg={handleSendMsg} socket={socket} currentChat={currentChat} startShare={startShare} />
     </Container>
   );
 }
@@ -177,5 +224,20 @@ const Container = styled.div`
         background-color: #9900ff20;
       }
     }
+  }
+`;
+
+const Button = styled.button`
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 0.5rem;
+  border-radius: 0.5rem;
+  background-color: #9a86f3;
+  border: none;
+  cursor: pointer;
+  svg {
+    font-size: 1.3rem;
+    color: #ebe7ff;
   }
 `;

@@ -5,6 +5,7 @@ const authRoutes = require("./routes/auth");
 const messageRoutes = require("./routes/messages");
 const app = express();
 const socket = require("socket.io");
+const { v4: uuidv4 } = require("uuid");
 require("dotenv").config();
 
 app.use(cors());
@@ -34,7 +35,7 @@ const server = app.listen(process.env.PORT, () =>
 );
 const io = socket(server, {
   cors: {
-    origin: "http://localhost:3000",
+    origin: "*",
     credentials: true,
   },
 });
@@ -51,5 +52,49 @@ io.on("connection", (socket) => {
     if (sendUserSocket) {
       socket.to(sendUserSocket).emit("msg-recieve", data.msg);
     }
+  });
+
+  socket.on("send-is-typing", (data) => {
+    const sendUserSocket = onlineUsers.get(data.to);
+    if (sendUserSocket) {
+      socket.to(sendUserSocket).emit("recieve-is-typing", data.msg);
+    }
+  });
+
+  socket.on("connect-request", ({ to, from }) => {
+    const sendUserSocket = onlineUsers.get(to);
+    if (sendUserSocket) {
+      const roomId = uuidv4();
+      socket.to(sendUserSocket).emit("connect-request-received", { roomId, from });
+    }
+  });
+
+  socket.on("accept-connect", ({ roomId, to }) => {
+    const sendUserSocket = onlineUsers.get(to);
+    if (sendUserSocket) {
+      socket.to(sendUserSocket).emit("connect-accepted", { roomId });
+    }
+  });
+
+  socket.on("join-room", ({ roomId, userId }) => {
+    socket.join(roomId);
+    socket.to(roomId).emit("user-connected", userId);
+  });
+
+  socket.on("send-message", ({ roomId, message, from }) => {
+    socket.to(roomId).emit("receive-message", { message, from });
+  });
+
+  // Handle WebRTC signaling
+  socket.on("offer", ({ offer }) => {
+    socket.broadcast.emit("offer", offer);
+  });
+
+  socket.on("answer", ({ answer }) => {
+    socket.broadcast.emit("answer", answer);
+  });
+
+  socket.on("candidate", ({ candidate }) => {
+    socket.broadcast.emit("candidate", candidate);
   });
 });

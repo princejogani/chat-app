@@ -1,10 +1,10 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { BsEmojiSmileFill } from "react-icons/bs";
-import { IoMdSend } from "react-icons/io";
+import { IoMdCloudUpload, IoMdSend } from "react-icons/io";
 import styled from "styled-components";
 import Picker from "emoji-picker-react";
 
-export default function ChatInput({ handleSendMsg }) {
+export default function ChatInput({ handleSendMsg, socket, currentChat, startShare }) {
   const [msg, setMsg] = useState("");
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const handleEmojiPickerhideShow = () => {
@@ -25,6 +25,17 @@ export default function ChatInput({ handleSendMsg }) {
     }
   };
 
+  useEffect(() => {
+    const data = JSON.parse(
+      localStorage.getItem(process.env.REACT_APP_LOCALHOST_KEY)
+    );
+    socket.current.emit("send-is-typing", {
+      to: currentChat._id,
+      from: data._id,
+      msg,
+    });
+  }, [msg])
+
   return (
     <Container>
       <div className="button-container">
@@ -40,6 +51,9 @@ export default function ChatInput({ handleSendMsg }) {
           onChange={(e) => setMsg(e.target.value)}
           value={msg}
         />
+        <button type="button" onClick={() => startShare()}>
+          <IoMdCloudUpload />
+        </button>
         <button type="submit">
           <IoMdSend />
         </button>
@@ -103,7 +117,6 @@ const Container = styled.div`
     border-radius: 2rem;
     display: flex;
     align-items: center;
-    gap: 2rem;
     background-color: #ffffff34;
     input {
       width: 90%;
